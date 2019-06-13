@@ -1,0 +1,190 @@
+##########################################################################
+#Developed by: Andre Luiz Alves de Souza
+#When: 13/06/2019
+#Requirerments: Tested in Powershell 3.0
+#Purpose: Copy large amount of files, through a network connection,
+#and generates a report in C:\log.txt. Has the option to filter files
+#to copy, based on the date of the last file change.
+#
+############################################################################
+
+
+
+
+
+#1) obter os arquivos nao alterados há x anos.
+
+#2) obter o path desse arquivo.
+
+#3) verificar se o mesmo path está criado no destino.
+
+#4) Criar o path caso nao esteja criado.
+
+#5) Copiar o arquivo.
+
+#6) Escrever o log de sucesso.
+param ($origin, $target, $before, $taxa)
+$before = -1000
+$origin = "H:\IT"
+$target = "\\loebrsaowdc001\ITNEW"
+$taxa = 2 #MBps taxa de transmissão da rede.
+
+
+#Receives as parameters a directory and a number of days (negative), and returns all the files 
+#with LastWriteTime atribute value minor than the expression (today - number of days) 
+function GetFile 
+{
+    $cutOffDate = (Get-Date).AddDays($args[1])
+    $file = Get-ChildItem -Recurse $args[0] -file | Where-Object {$_.LastWriteTime -le $cutOffDate} 
+    return $file
+}
+
+#Receives 2 arguments (directory and file name) and builds a UNC path
+function UncPath 
+{
+     $unc = $args[1]+"\"+$args[0]
+
+}
+
+
+
+#Receives a source directory and a target directory, and verifies if there is an existing
+#directory in the target, with the same name as the source directory.
+function PathVerify 
+{
+    $unc = $args[1]+"\"+$args[0]
+    $path = Test-Path $unc
+    if (-Not $path -like "true")
+    {
+        New-Item -ItemType "directory" -Path $unc
+    }
+}
+
+#Receives a directory and a number x, and removes the first x carachters. 
+function RelativePath 
+{
+    $relative = $args[0].Substring($args[1])
+    return $relative
+}
+
+
+#Creates a directory structure in a target drive,as the same of the source.
+
+function CreateDirectory 
+{
+    foreach ($entry in $args[0])
+    {
+        $directory = RelativePath $entry.DirectoryName 3
+        PathVerify $directory $target                 
+    }
+}
+
+
+#Receives a file path and tests if it exists.
+function FileVerify 
+{
+    $filetoverify = Test-Path $args[0]
+    if ($filetoverify -like "true")
+    {
+        return "false"
+    }
+    else 
+    {
+        return "true"
+
+    }
+
+
+}
+
+#Receveives an output of get-childitem command, and calculates the total file size.
+function CalculateCopySize
+{
+    $counter = 0
+    foreach ($entry in $args[0])
+    {
+        $size = $entry.length / (1024 *1000)
+        $counter = $counter + $size
+    }
+    return $counter
+
+}
+
+#Receives a size in MB and a transmition rate in MBps and estimates how much time a copy will take;
+function EstimateTime
+{
+    $time = [int] ($args[0] / $args[1])
+    return $time
+}
+
+
+
+#Receives an output of get-childitem and copyies a file to a detination directory.
+function CopyFiles {
+
+    foreach ($entry in $args[0])
+    {
+        $directory = $entry.Directory
+        $name = $entry.Name
+        $filetocopy = "$directory"+"\"+"$name"
+        $filedest = RelativePath $filetocopy 3
+        
+        $filecopied = $target+"\"+$filedest
+        $verify = FileVerify $filecopied
+        $date = get-date
+        if ($verify -like "true")
+        {
+            Copy-Item $filetocopy $target"\"$filedest
+            $verify = FileVerify $filecopied
+            if ($verify -like "true")
+            {
+                $log = "Falha ao copiar: "+$filecopied
+                $log >> C:\log.txt
+            }
+            if ($verify -like "false")
+            {
+                $log = "Sucesso ao copiar: "+$filecopied
+                $log >> C:\log.txt
+            }
+        }
+        elseif ($verify -like "false")
+        {
+           $log = "O arquivo já existe -Skipped: "+$filecopied
+           $log >> C:\log.txt 
+        }
+    }
+}
+
+
+$objfile = getFile $origin $before                                          
+CreateDirectory $objfile $target
+$JobSize = CalculateCopySize $objfile
+$JobSize = [int]$JobSize
+$time = EstimateTime $JobSize $taxa #MBps
+$time = [int]$time 
+
+$line1 = "Serão copiados arquivos do diretório : "+$origin
+$line2 = "O destino da copia é o diretorio: "+$target
+$line3 = "O tamanho da copia é: "+$JobSize+" MB"
+$line4 = "O tempo estimado em segundos para a cópia é : "+$time+"segundos"
+$lastchange = (Get-Date).AddDays($before)
+$line5 = "Os arquivos copiados tem data da última alteracao anterior a: "+$lastchange
+$separator = "#######################################################"
+
+
+$separator >> C:\log.txt
+$line1 >> C:\log.txt
+$line2 >> C:\log.txt
+$line3 >> C:\log.txt
+$line4 >> C:\log.txt
+$line5 >> C:\log.txt
+$separator >> C:\log.txt
+
+CopyFiles $objfile
+
+
+
+
+
+
+
