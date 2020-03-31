@@ -1,0 +1,22 @@
+Import-Module ServerManager
+Add-WindowsFeature -Name "RSAT-AD-PowerShell" –IncludeAllSubFeature
+
+import-module activedirectory
+$user = "vcunha"
+$path = "Z:\"
+$dir = $HOME+"\Downloads\permissions.csv"
+Get-ADPrincipalGroupMembership $user | foreach-object {
+    $group = "FQMNET\"+$_.name
+    $FolderPath = Get-ChildItem -Directory -Path $path -Recurse -Force
+    ForEach ($Folder in $FolderPath) {
+        write-host $Folder
+        $Acl = Get-Acl -Path $Folder.FullName
+        ForEach ($Access in $Acl.Access) {
+            $Properties = [ordered]@{'Folder Name'=$Folder.FullName;'GroupUser'=$Access.IdentityReference;'Permissions'=$Access.FileSystemRights;'Inherited'=$Access.IsInherited}
+            if ($Properties['GroupUser'] -like $group) {
+                $out =  $Properties['Folder Name']+";"+$Properties['GroupUser']
+                $out >> $dir           
+            }
+        }
+    }
+}
