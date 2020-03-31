@@ -2,11 +2,11 @@ Import-Module ServerManager
 Add-WindowsFeature -Name "RSAT-AD-PowerShell" –IncludeAllSubFeature
 
 import-module activedirectory
-$user = "vcunha"
+$user = "login"
 $path = "Z:\"
 $dir = $HOME+"\Downloads\permissions.csv"
 Get-ADPrincipalGroupMembership $user | foreach-object {
-    $group = "FQMNET\"+$_.name
+    $group = "DOMINIO\"+$_.name
     $FolderPath = Get-ChildItem -Directory -Path $path -Recurse -Force
     ForEach ($Folder in $FolderPath) {
         write-host $Folder
