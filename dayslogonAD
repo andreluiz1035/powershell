@@ -1,0 +1,12 @@
+
+#Filtra os usuários que estão há mais de 40 dias sem logar no AD
+
+
+$OU = "OU=abc,DC=defg,DC=local"
+$days = -40
+$users = Get-ADUser -Filter * -SearchBase $OU -Properties Name,SamAccountName,LastLogonDate | Where {($_.LastLogonDate -lt (Get-Date).AddDays($days)) -and ($_.LastLogonDate -ne $NULL)} | Sort | Select Name,SamAccountName,LastLogonDate
+$users >> C:\script\DaysLogonOut.txt
+$users.count >> C:\script\DaysLogonOut.txt
+
+
+
