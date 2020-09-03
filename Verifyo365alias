@@ -1,0 +1,39 @@
+#######################################################################################
+#Script para validar quais usuário de office 365 estão sem um alias de e-mail específico.
+#Desenvolvido por: Andre Luiz - 03/09/2020
+#
+#
+
+
+$Credentials = Get-Credential
+    $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $Credentials -Authentication Basic -AllowRedirection
+    Import-PSSession $Session -DisableNameChecking
+
+
+    
+Connect-MsolService
+
+get-mailbox | fl identity
+
+         $a =get-mailbox -ResultSize unlimited 
+         $out = "identity"+","+"emailfqmcombr"
+         $out >> C:\temp\ps1\fqm\alias\mailboxes.csv
+         $coutfalse = 0
+         foreach ($entry in $a) {
+            $identity = $entry.identity
+            $email = $entry.EmailAddresses
+            $emailfqmcombr  = $email | Select-String -Pattern '@contoso.com.br' | Out-String
+            if ($emailfqmcombr) {
+                $alias = "TRUE"
+            }
+            else {
+                $alias = "FALSE"
+                $countfalse = $countfalse + 1
+            }
+            $out = $identity+","+$alias
+            $out >> C:\temp\ps1\fqm\alias\mailboxes.csv
+         }
+         $total = "TOTAL FALSE"+","+$coutfalse
+         $total >> C:\temp\ps1\fqm\alias\mailboxes.csv
+
+
