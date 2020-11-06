@@ -1,0 +1,88 @@
+###############################################################################################
+#Desenvolvido por: Andre Luiz
+#Data: 06/11/2020
+#Motivo: Comparar as máquinas que estão no SCCM versus máquinas que estão no AD.
+##############################################################################################
+#
+#
+#
+# Press 'F5' to run this script. Running this script will load the ConfigurationManager
+# module for Windows PowerShell and will connect to the site.
+#
+# This script was auto-generated at '22/10/2020 15:50:53'.
+
+# Uncomment the line below if running in an environment where script signing is 
+# required.
+#Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
+
+# Site configuration
+$SiteCode = "XXX" # Site code 
+$ProviderMachineName = "XXX.xxx.net" # SMS Provider machine name
+
+# Customizations
+$initParams = @{}
+#$initParams.Add("Verbose", $true) # Uncomment this line to enable verbose logging
+#$initParams.Add("ErrorAction", "Stop") # Uncomment this line to stop the script on any errors
+
+# Do not change anything below this line
+
+# Import the ConfigurationManager.psd1 module 
+if((Get-Module ConfigurationManager) -eq $null) {
+    Import-Module "$($ENV:SMS_ADMIN_UI_PATH)\..\ConfigurationManager.psd1" @initParams 
+}
+
+# Connect to the site's drive if it is not already present
+if((Get-PSDrive -Name $SiteCode -PSProvider CMSite -ErrorAction SilentlyContinue) -eq $null) {
+    New-PSDrive -Name $SiteCode -PSProvider CMSite -Root $ProviderMachineName @initParams
+}
+
+# Set the current location to be the site code.
+Set-Location "$($SiteCode):\" @initParams
+
+$d = (Get-Date).Day
+$m = (Get-Date).Month
+$y = (Get-Date).Year
+$file = "C:\temp\SCCM_AD"+$d+$m+$y+".txt"
+$header =  "Maquinas que estão no SCCM e não estão no AD."
+$header >> $file
+$pc = "HOSTS"
+$pc >> $file
+
+
+#Computadores que estão no SCCM e não estão no AD
+$col =  Get-CMCollection -Name "All Systems"
+$comp = $col | Get-CMCollectionMember
+Import-Module activedirectory
+foreach ($entry in $comp) {
+    
+    $pc = Get-ADComputer   -identity $entry.name 
+    if ($? -eq $false) {
+        if ($entry.name -notlike "x86 Unknown Computer (x86 Unknown Computer)" -and $entry.name -notlike "x64 Unknown Computer (x64 Unknown Computer)" -and $entry.name -notlike "Unknown") {
+            $entry.name >> $file
+        }
+    }
+}
+
+$header = 'Maquinas que estão no AD e não estão no SCCM'
+$header >> $file
+$header = "Hostname;LastLogonDate"
+$header >> $file
+
+#Computadores que estão no AD e não estão no SCCM
+$adpc = Get-ADComputer -Properties * -Filter *
+foreach ($entry in $adpc) {
+    $flag = 0
+    foreach ($entry2 in $comp) {
+        if ($entry2.name -eq $entry.name) {  
+            $flag = 1
+        }
+    }
+
+    if ($flag -eq 0) {
+        if ($entry.OperatingSystem -notlike "*Server*") {       
+            $out = $entry.Name+";"+$entry.LastLogonDate >> $file
+            #$entry.name >> $file
+        }
+     }
+}
+
